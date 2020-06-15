@@ -1602,3 +1602,62 @@ func (s *ProjectsService) TransferProject(pid interface{}, opt *TransferProjectO
 
 	return p, resp, err
 }
+
+// ProjectMergeTrainDetailOptions represents the available
+// GetProjectMergeTrainDetails() options.
+//
+// GitLab API docs:
+// https://docs.gitlab.com/ee/api/merge_trains.html#list-merge-trains-for-a-project
+type GetProjectMergeTrainDetailOptions struct {
+	Scope *string `url:"scope,omitempty" json:"scope,omitempty"`
+	Sort  *string `url:"sort,omitempty" json:"sort,omitempty"`
+}
+
+// ProjectMergeTrainCar represents a single "car" on the merge train.
+//
+// GitLab API docs:
+// https://docs.gitlab.com/ee/api/merge_trains.html#list-merge-trains-for-a-project
+type ProjectMergeTrainCar struct {
+	ID           uint          `json:"id"`
+	MergeRequest *MergeRequest `json:"merge_request"`
+	User         *User         `json:"user"`
+	Pipeline     *Pipeline     `json:"pipeline"`
+	CreatedAt    *time.Time    `json:"created_at"`
+	UpdatedAt    *time.Time    `json:"updated_at"`
+	TargetBranch string        `json:"target_branch"`
+	Status       string        `json:"status"`
+	MergedAt     *time.Time    `json:"merged_at"`
+	Duration     uint          `json:"duration"`
+}
+
+// ProjectMergeTrain represents a project's merge train.
+//
+// GitLab API docs:
+// https://docs.gitlab.com/ee/api/merge_trains.html#list-merge-trains-for-a-project
+type ProjectMergeTrain []*ProjectMergeTrainCar
+
+// GetProjectMergeTrainDetails() returns the current merge train state for the
+// project.
+//
+// GitLab API docs:
+// https://docs.gitlab.com/ee/api/merge_trains.html#list-merge-trains-for-a-project
+func (s *ProjectsService) GetProjectMergeTrainDetails(pid interface{}, opt *GetProjectMergeTrainDetailOptions, options ...RequestOptionFunc) (ProjectMergeTrain, *Response, error) {
+	project, err := parseID(pid)
+	if err != nil {
+		return nil, nil, err
+	}
+	u := fmt.Sprintf("projects/%s/merge_trains", pathEscape(project))
+
+	req, err := s.client.NewRequest("GET", u, opt, options)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	var train ProjectMergeTrain
+	resp, err := s.client.Do(req, &train)
+	if err != nil {
+		return nil, resp, err
+	}
+
+	return train, resp, err
+}

@@ -8,6 +8,9 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"time"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestListProjects(t *testing.T) {
@@ -904,4 +907,103 @@ func TestCreateProjectApprovalRule(t *testing.T) {
 	if !reflect.DeepEqual(want, rule) {
 		t.Errorf("Projects.CreateProjectApprovalRule returned %+v, want %+v", rule, want)
 	}
+}
+
+func TestGetProjectMergeTrainDetails(t *testing.T) {
+	mux, server, client := setup(t)
+	defer teardown(server)
+
+	mux.HandleFunc("/api/v4/projects/1/merge_trains", func(w http.ResponseWriter, r *http.Request) {
+		testMethod(t, r, "GET")
+		fmt.Fprint(w, `[
+			{
+				"id": 110,
+				"merge_request": {
+					"id": 126,
+					"iid": 59,
+					"project_id": 20,
+					"title": "Test MR 1580978354",
+					"description": "",
+					"state": "merged",
+					"created_at": "2020-02-06T08:39:14.883Z",
+					"updated_at": "2020-02-06T08:40:57.038Z",
+					"web_url": "http://local.gitlab.test:8181/root/merge-train-race-condition/-/merge_requests/59"
+				},
+				"user": {
+					"id": 1,
+					"name": "Administrator",
+					"username": "root",
+					"state": "active",
+					"avatar_url": "https://www.gravatar.com/avatar/e64c7d89f26bd1972efa854d13d7dd61?s=80&d=identicon",
+					"web_url": "http://local.gitlab.test:8181/root"
+				},
+				"pipeline": {
+					"id": 246,
+					"sha": "bcc17a8ffd51be1afe45605e714085df28b80b13",
+					"ref": "refs/merge-requests/59/train",
+					"status": "success",
+					"created_at": "2020-02-06T08:39:14.883Z",
+					"updated_at": "2020-02-06T08:40:57.038Z",
+					"web_url": "http://local.gitlab.test:8181/root/merge-train-race-condition/pipelines/246"
+				},
+				"created_at": "2020-02-06T08:39:14.883Z",
+				"updated_at": "2020-02-06T08:40:57.038Z",
+				"target_branch": "feature-1580973432",
+				"status": "merged",
+				"merged_at": "2020-02-06T08:40:57.719Z",
+				"duration": 70
+			}
+		]`)
+	})
+
+	createdAt, _ := time.Parse(time.RFC3339, "2020-02-06T08:39:14.883Z")
+	updatedAt, _ := time.Parse(time.RFC3339, "2020-02-06T08:40:57.038Z")
+	mergedAt, _ := time.Parse(time.RFC3339, "2020-02-06T08:40:57.719Z")
+
+	want := ProjectMergeTrain{{
+		ID: 110,
+		MergeRequest: &MergeRequest{
+			ID:          126,
+			IID:         59,
+			ProjectID:   20,
+			Title:       "Test MR 1580978354",
+			Description: "",
+			State:       "merged",
+			// CreatedAt:   time.Parse(time.RFC3339, "2020-02-06T08:39:14.883Z"),
+			// UpdatedAt:   time.Parse(time.RFC3339, "2020-02-06T08:40:57.038Z"),
+			CreatedAt: &createdAt,
+			UpdatedAt: &updatedAt,
+			WebURL:    "http://local.gitlab.test:8181/root/merge-train-race-condition/-/merge_requests/59",
+		},
+		User: &User{
+			ID:        1,
+			Name:      "Administrator",
+			Username:  "root",
+			State:     "active",
+			AvatarURL: "https://www.gravatar.com/avatar/e64c7d89f26bd1972efa854d13d7dd61?s=80&d=identicon",
+			WebURL:    "http://local.gitlab.test:8181/root",
+		},
+		Pipeline: &Pipeline{
+			ID:        246,
+			SHA:       "bcc17a8ffd51be1afe45605e714085df28b80b13",
+			Ref:       "refs/merge-requests/59/train",
+			Status:    "success",
+			CreatedAt: &createdAt,
+			UpdatedAt: &updatedAt,
+			WebURL:    "http://local.gitlab.test:8181/root/merge-train-race-condition/pipelines/246",
+		},
+		CreatedAt:    &createdAt,
+		UpdatedAt:    &updatedAt,
+		TargetBranch: "feature-1580973432",
+		Status:       "merged",
+		MergedAt:     &mergedAt,
+		Duration:     70,
+	}}
+
+	mt, _, err := client.Projects.GetProjectMergeTrainDetails(1, nil)
+	if err != nil {
+		t.Fatalf("Projects.GetProjectMergeTrainDetails returns an error: %v", err)
+	}
+
+	require.Equal(t, want, mt)
 }
